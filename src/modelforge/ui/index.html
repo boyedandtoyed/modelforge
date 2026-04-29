@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ModelForge — LLM Fine-tuning Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 950: '#050d1a', 900: '#0a1628', 800: '#0f1e36', 700: '#152642' },
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #050d1a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+
+    /* Gradient text */
+    .grad { background: linear-gradient(135deg, #818cf8, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+    /* Cards */
+    .card { background: #0c1830; border: 1px solid #1e3050; border-radius: 14px; }
+    .card-glow { background: #0c1830; border: 1px solid rgba(99,102,241,.35); border-radius: 14px; box-shadow: 0 0 28px rgba(99,102,241,.1); }
+
+    /* Stat card accent line */
+    .stat-card { background: #0c1830; border: 1px solid #1e3050; border-radius: 14px; padding: 24px; position: relative; overflow: hidden; }
+    .stat-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .stat-blue::after { background: linear-gradient(90deg, transparent, #6366f1, transparent); }
+    .stat-green::after { background: linear-gradient(90deg, transparent, #10b981, transparent); }
+    .stat-cyan::after { background: linear-gradient(90deg, transparent, #06b6d4, transparent); }
+    .stat-amber::after { background: linear-gradient(90deg, transparent, #f59e0b, transparent); }
+
+    /* Sidebar */
+    .sidebar { background: #080f1f; border-right: 1px solid #1a2744; width: 220px; flex-shrink: 0; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13.5px; font-weight: 500; color: #64748b; transition: all .18s; }
+    .nav-item:hover { background: rgba(99,102,241,.1); color: #a5b4fc; }
+    .nav-item.active { background: rgba(99,102,241,.16); color: #818cf8; }
+    .nav-item svg { flex-shrink: 0; }
+
+    /* Buttons */
+    .btn { padding: 9px 20px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; border: none; transition: all .18s; }
+    .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(99,102,241,.45); }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-ghost { background: rgba(99,102,241,.1); color: #818cf8; border: 1px solid rgba(99,102,241,.25); }
+    .btn-ghost:hover { background: rgba(99,102,241,.2); }
+    .btn-danger { background: rgba(239,68,68,.1); color: #f87171; border: 1px solid rgba(239,68,68,.25); }
+    .btn-danger:hover { background: rgba(239,68,68,.2); }
+
+    /* Form inputs */
+    .inp { background: #07101f; border: 1px solid #1e3050; border-radius: 8px; padding: 9px 13px; color: #e2e8f0; font-size: 13.5px; width: 100%; outline: none; transition: border-color .18s; }
+    .inp:focus { border-color: #6366f1; }
+    .inp[type=range] { background: transparent; border: none; padding: 0; cursor: pointer; accent-color: #6366f1; }
+    select.inp option { background: #0c1830; }
+    label.lbl { display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+
+    /* Progress */
+    .progress { height: 6px; background: #1e3050; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 3px; transition: width .3s ease; }
+
+    /* Table */
+    .tbl { width: 100%; border-collapse: collapse; }
+    .tbl th { padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #1e3050; }
+    .tbl td { padding: 13px 16px; font-size: 13.5px; border-bottom: 1px solid #111e35; }
+    .tbl tbody tr { cursor: pointer; transition: background .15s; }
+    .tbl tbody tr:hover td { background: rgba(99,102,241,.06); }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 11.5px; font-weight: 600; }
+    .badge-indigo { background: rgba(99,102,241,.15); color: #a5b4fc; }
+    .badge-green  { background: rgba(16,185,129,.15); color: #34d399; }
+    .badge-amber  { background: rgba(245,158,11,.15); color: #fbbf24; }
+    .badge-red    { background: rgba(239,68,68,.15); color: #f87171; }
+    .badge-cyan   { background: rgba(6,182,212,.15); color: #22d3ee; }
+
+    /* Mono */
+    .mono { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; font-size: 12.5px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e3050; border-radius: 3px; }
+
+    /* Pulse animation */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+
+    /* Fade in */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .fade-up { animation: fadeUp .3s ease-out forwards; }
+
+    /* Glow dot */
+    .dot-green { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981; }
+    .dot-amber { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+
+    /* Textarea */
+    textarea.inp { resize: vertical; min-height: 110px; }
+
+    /* Code block */
+    .code-block { background: #060d1c; border: 1px solid #1e3050; border-radius: 10px; padding: 16px 20px; font-family: ui-monospace, monospace; font-size: 13px; color: #a5b4fc; white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body x-data="app()" x-init="init()" style="display:flex; min-height:100vh; overflow:hidden;">
+
+  <!-- ═══════════════════════════ SIDEBAR ═══════════════════════════ -->
+  <aside class="sidebar flex flex-col h-screen sticky top-0">
+    <!-- Logo -->
+    <div class="px-5 pt-6 pb-5">
+      <div class="flex items-center gap-2.5">
+        <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">⚒</div>
+        <div>
+          <div class="font-bold text-base text-white leading-tight">ModelForge</div>
+          <div class="text-xs" style="color:#475569;">LLM Fine-tuning</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-3 py-1">
+      <div class="text-xs font-semibold uppercase tracking-widest mb-2 px-2" style="color:#2d4060;">Navigation</div>
+
+      <button @click="navigate('dashboard')" :class="['nav-item w-full text-left', page==='dashboard' ? 'active' : '']">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+
+      <button @click="navigate('train')" :class="['nav-item w-full text-left mt-0.5', page==='train' ? 'active' : '']">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        Train Model
+      </button>
+
+      <button @click="navigate('runs')" :class="['nav-item w-full text-left mt-0.5', page==='runs' ? 'active' : '']">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/></svg>
+        Experiment Runs
+      </button>
+
+      <button @click="navigate('playground')" :class="['nav-item w-full text-left mt-0.5', page==='playground' ? 'active' : '']">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Playground
+      </button>
+    </div>
+
+    <!-- Spacer -->
+    <div class="flex-1"></div>
+
+    <!-- Status bar -->
+    <div class="px-4 py-4 border-t" style="border-color:#1a2744;">
+      <div class="flex items-center gap-2">
+        <div :class="stats.training_active ? 'dot-amber pulse' : 'dot-green'"></div>
+        <span class="text-xs" style="color:#475569;" x-text="stats.training_active ? 'Training active' : 'System idle'"></span>
+      </div>
+      <div class="text-xs mt-1.5" style="color:#2d4060;">v0.1.0 · modelforge.binodtiwari.com</div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════ MAIN ═══════════════════════════ -->
+  <main class="flex-1 overflow-y-auto" style="background:#060d1b;">
+
+    <!-- ── DASHBOARD ─────────────────────────────────────── -->
+    <div x-show="page === 'dashboard'" class="p-8 fade-up max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-7">
+        <div>
+          <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+          <p class="text-sm mt-1" style="color:#475569;">Overview of your fine-tuning experiments</p>
+        </div>
+        <button class="btn btn-ghost" @click="refresh()">
+          <svg class="inline mr-1.5" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card stat-blue">
+          <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Total Runs</div>
+          <div class="text-3xl font-bold text-white" x-text="stats.total_runs ?? 0"></div>
+          <div class="text-xs mt-2" style="color:#6366f1;">experiments tracked</div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Best Loss</div>
+          <div class="text-3xl font-bold text-white" x-text="stats.best_loss != null ? stats.best_loss.toFixed(4) : '—'"></div>
+          <div class="text-xs mt-2" style="color:#10b981;">cross-entropy</div>
+        </div>
+        <div class="stat-card stat-cyan">
+          <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Compute Hours</div>
+          <div class="text-3xl font-bold text-white" x-text="stats.total_hours ?? '0'"></div>
+          <div class="text-xs mt-2" style="color:#06b6d4;">training time</div>
+        </div>
+        <div class="stat-card stat-amber">
+          <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Status</div>
+          <div class="text-2xl font-bold" :class="stats.training_active ? 'text-amber-400' : 'text-emerald-400'" x-text="stats.training_active ? 'Training' : 'Idle'"></div>
+          <div class="text-xs mt-2" style="color:#f59e0b;" x-text="stats.training_active ? 'job in progress' : 'ready to train'"></div>
+        </div>
+      </div>
+
+      <!-- Recent runs -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h2 class="font-semibold text-white">Recent Experiments</h2>
+          <button @click="navigate('runs')" class="text-xs" style="color:#6366f1;">View all →</button>
+        </div>
+        <template x-if="runs.length === 0">
+          <div class="text-center py-12" style="color:#334155;">
+            <div class="text-4xl mb-3">⚒</div>
+            <div class="text-sm">No experiments yet.</div>
+            <button @click="navigate('train')" class="btn btn-primary mt-4 text-sm">Start your first run</button>
+          </div>
+        </template>
+        <template x-if="runs.length > 0">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Run ID</th>
+                <th>Model</th>
+                <th>Dataset</th>
+                <th>Best Loss</th>
+                <th>Steps</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="run in runs.slice(0,6)" :key="run.run_id">
+                <tr @click="navigate('runs'); expandedRun = run">
+                  <td class="mono" style="color:#818cf8;" x-text="run.run_id?.split('-').slice(-1)[0]?.slice(0,8)"></td>
+                  <td style="color:#cbd5e1;" x-text="run.config?.base_model?.split('/').pop()?.slice(0,24)"></td>
+                  <td style="color:#64748b;" x-text="run.config?.dataset?.split('/').pop()?.slice(0,20)"></td>
+                  <td class="mono" style="color:#34d399;" x-text="run.best_loss?.toFixed(4)"></td>
+                  <td style="color:#94a3b8;" x-text="run.metrics?.length"></td>
+                  <td style="color:#64748b;" x-text="fmtDur(run.duration_seconds)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+      </div>
+
+      <!-- Quick start -->
+      <div class="card-glow p-6 mt-4">
+        <h3 class="font-semibold text-white mb-3">Quick CLI Reference</h3>
+        <div class="grid md:grid-cols-3 gap-3">
+          <div class="code-block text-xs">modelforge train \
+  --model meta-llama/Llama-2-7b-hf \
+  --dataset tatsu-lab/alpaca \
+  --epochs 3</div>
+          <div class="code-block text-xs">modelforge runs</div>
+          <div class="code-block text-xs">modelforge serve \
+  --adapter ./outputs/adapter \
+  --port 8080</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TRAIN ─────────────────────────────────────── -->
+    <div x-show="page === 'train'" class="p-8 fade-up max-w-5xl mx-auto">
+      <div class="mb-7">
+        <h1 class="text-2xl font-bold text-white">Train Model</h1>
+        <p class="text-sm mt-1" style="color:#475569;">Configure and launch a QLoRA fine-tuning run</p>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-6">
+        <!-- Config form -->
+        <div class="card p-6">
+          <h2 class="font-semibold text-white mb-5">Configuration</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="lbl">Base Model</label>
+              <input class="inp" type="text" list="models" x-model="trainForm.base_model" :disabled="isTraining" />
+              <datalist id="models">
+                <option value="meta-llama/Llama-2-7b-hf"/>
+                <option value="mistralai/Mistral-7B-v0.1"/>
+                <option value="microsoft/phi-2"/>
+                <option value="google/gemma-2b"/>
+                <option value="tiiuae/falcon-7b"/>
+                <option value="bigscience/bloom-560m"/>
+              </datalist>
+            </div>
+            <div>
+              <label class="lbl">Dataset (HuggingFace)</label>
+              <input class="inp" type="text" list="datasets" x-model="trainForm.dataset" :disabled="isTraining" />
+              <datalist id="datasets">
+                <option value="tatsu-lab/alpaca"/>
+                <option value="HuggingFaceH4/ultrachat_200k"/>
+                <option value="timdettmers/openassistant-guanaco"/>
+                <option value="databricks/databricks-dolly-15k"/>
+                <option value="Open-Orca/OpenOrca"/>
+              </datalist>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="lbl">Epochs</label>
+                <input class="inp" type="number" min="1" max="20" x-model.number="trainForm.num_epochs" :disabled="isTraining" />
+              </div>
+              <div>
+                <label class="lbl">Max Samples</label>
+                <input class="inp" type="number" min="10" max="10000" x-model.number="trainForm.max_samples" :disabled="isTraining" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="lbl">Batch Size</label>
+                <input class="inp" type="number" min="1" max="64" x-model.number="trainForm.per_device_train_batch_size" :disabled="isTraining" />
+              </div>
+              <div>
+                <label class="lbl">Learning Rate</label>
+                <input class="inp" type="text" x-model="trainForm.learning_rate" :disabled="isTraining" />
+              </div>
+            </div>
+
+            <!-- LoRA section -->
+            <div class="pt-2 border-t" style="border-color:#1e3050;">
+              <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">LoRA Config</div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="lbl">LoRA rank (r)</label>
+                  <input class="inp" type="number" min="1" max="256" x-model.number="trainForm.lora_r" :disabled="isTraining" />
+                </div>
+                <div>
+                  <label class="lbl">LoRA alpha</label>
+                  <input class="inp" type="number" min="1" x-model.number="trainForm.lora_alpha" :disabled="isTraining" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="lbl">Experiment Name</label>
+              <input class="inp" type="text" x-model="trainForm.experiment_name" :disabled="isTraining" />
+            </div>
+          </div>
+
+          <button class="btn btn-primary w-full mt-6" @click="startTraining()" :disabled="isTraining">
+            <span x-show="!isTraining">
+              <svg class="inline mr-2" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+              Launch Training Run
+            </span>
+            <span x-show="isTraining" class="pulse">Training in progress…</span>
+          </button>
+
+          <template x-if="trainError">
+            <div class="mt-3 p-3 rounded-lg text-sm" style="background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.25);" x-text="trainError"></div>
+          </template>
+        </div>
+
+        <!-- Live progress -->
+        <div class="flex flex-col gap-4">
+          <!-- Metrics row -->
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="font-semibold text-white">Live Progress</h2>
+              <span class="badge" :class="isTraining ? 'badge-amber' : trainResult ? 'badge-green' : 'badge-indigo'" x-text="isTraining ? 'Running' : trainResult ? 'Complete' : 'Idle'"></span>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="progress mb-2">
+              <div class="progress-fill" :style="`width:${progressPct}%`"></div>
+            </div>
+            <div class="flex justify-between text-xs mb-4" style="color:#475569;">
+              <span x-text="`Step ${trainProgress.step} / ${trainProgress.total}`"></span>
+              <span x-text="`${progressPct}%`"></span>
+            </div>
+
+            <!-- Metric badges -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-lg" style="background:#07101f;border:1px solid #1e3050;">
+                <div style="color:#475569;" class="mb-0.5">Loss</div>
+                <div class="mono font-semibold" style="color:#818cf8;" x-text="trainProgress.loss ? trainProgress.loss.toFixed(4) : '—'"></div>
+              </div>
+              <div class="p-2.5 rounded-lg" style="background:#07101f;border:1px solid #1e3050;">
+                <div style="color:#475569;" class="mb-0.5">LR</div>
+                <div class="mono font-semibold" style="color:#22d3ee;" x-text="trainProgress.lr ? trainProgress.lr.toExponential(2) : '—'"></div>
+              </div>
+              <div class="p-2.5 rounded-lg" style="background:#07101f;border:1px solid #1e3050;">
+                <div style="color:#475569;" class="mb-0.5">Epoch</div>
+                <div class="mono font-semibold text-white" x-text="trainProgress.epoch ?? '—'"></div>
+              </div>
+              <div class="p-2.5 rounded-lg" style="background:#07101f;border:1px solid #1e3050;">
+                <div style="color:#475569;" class="mb-0.5">tok/s</div>
+                <div class="mono font-semibold" style="color:#34d399;" x-text="trainProgress.tokens_per_sec ? Math.round(trainProgress.tokens_per_sec) : '—'"></div>
+              </div>
+            </div>
+
+            <!-- Complete banner -->
+            <template x-if="trainResult">
+              <div class="mt-4 p-3 rounded-lg" style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);">
+                <div class="text-xs font-semibold" style="color:#34d399;">Training complete!</div>
+                <div class="text-xs mt-1" style="color:#64748b;">
+                  Best loss: <span class="mono text-white" x-text="trainResult.best_loss"></span> ·
+                  <span x-text="trainResult.steps"></span> steps ·
+                  <span x-text="fmtDur(trainResult.duration)"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Live chart -->
+          <div class="card p-5 flex-1" style="min-height:240px;">
+            <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Loss Curve</div>
+            <div style="position:relative;height:190px;">
+              <canvas id="liveChart"></canvas>
+              <template x-if="trainMetrics.length === 0">
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#2d4060;font-size:13px;">
+                  Start a training run to see the live loss curve
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RUNS ─────────────────────────────────────── -->
+    <div x-show="page === 'runs'" class="p-8 fade-up max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-7">
+        <div>
+          <h1 class="text-2xl font-bold text-white">Experiment Runs</h1>
+          <p class="text-sm mt-1" style="color:#475569;"><span x-text="runs.length"></span> runs logged</p>
+        </div>
+        <button class="btn btn-ghost" @click="loadRuns()">Refresh</button>
+      </div>
+
+      <template x-if="runs.length === 0">
+        <div class="card p-12 text-center" style="color:#334155;">
+          <div class="text-4xl mb-3">📊</div>
+          <div class="text-sm">No runs yet. <button @click="navigate('train')" style="color:#6366f1;">Train a model</button> to see results here.</div>
+        </div>
+      </template>
+
+      <template x-if="runs.length > 0">
+        <div class="card overflow-hidden">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Run ID</th>
+                <th>Model</th>
+                <th>Dataset</th>
+                <th>Best Loss</th>
+                <th>Steps</th>
+                <th>Duration</th>
+                <th></th>
+              </tr>
+            </thead>
+            <template x-for="run in runs" :key="run.run_id">
+              <tbody>
+                <tr @click="toggleRun(run)" :style="expandedRun?.run_id === run.run_id ? 'background:rgba(99,102,241,.08)' : ''">
+                  <td class="mono" style="color:#818cf8;" x-text="run.run_id?.split('-').slice(-1)[0]?.slice(0,10)"></td>
+                  <td style="color:#cbd5e1;" x-text="run.config?.base_model?.split('/').pop()?.slice(0,28)"></td>
+                  <td style="color:#64748b;" x-text="run.config?.dataset?.split('/').pop()?.slice(0,22)"></td>
+                  <td class="mono" style="color:#34d399;" x-text="run.best_loss?.toFixed(4)"></td>
+                  <td style="color:#94a3b8;" x-text="run.metrics?.length"></td>
+                  <td style="color:#64748b;" x-text="fmtDur(run.duration_seconds)"></td>
+                  <td>
+                    <button class="btn btn-danger" style="padding:4px 12px;font-size:11.5px;" @click.stop="deleteRun(run.run_id)">Delete</button>
+                  </td>
+                </tr>
+                <tr x-show="expandedRun?.run_id === run.run_id" style="display:none;">
+                  <td colspan="7" style="padding:0;border-bottom:1px solid #1e3050;">
+                    <div class="p-5" style="background:#070f20;">
+                      <div class="grid lg:grid-cols-3 gap-4">
+                        <div>
+                          <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Config</div>
+                          <div class="space-y-1.5 text-xs" style="color:#64748b;">
+                            <div>Epochs: <span class="text-white" x-text="run.config?.num_epochs"></span></div>
+                            <div>Batch size: <span class="text-white" x-text="run.config?.per_device_train_batch_size"></span></div>
+                            <div>LR: <span class="mono text-white" x-text="run.config?.learning_rate"></span></div>
+                            <div>LoRA r: <span class="text-white" x-text="run.config?.lora?.r"></span></div>
+                            <div>LoRA α: <span class="text-white" x-text="run.config?.lora?.lora_alpha"></span></div>
+                            <div>Samples: <span class="text-white" x-text="run.config?.max_samples ?? 'all'"></span></div>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Serve Command</div>
+                          <div class="code-block text-xs" x-text="`modelforge serve \\\n  --adapter ${run.config?.output_dir ?? './outputs'}/adapter \\\n  --port 8080`"></div>
+                        </div>
+                        <div>
+                          <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#475569;">Loss Curve</div>
+                          <div style="position:relative;height:130px;">
+                            <canvas :id="`runChart-${run.run_id}`"></canvas>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </template>
+          </table>
+        </div>
+      </template>
+    </div>
+
+    <!-- ── PLAYGROUND ─────────────────────────────────────── -->
+    <div x-show="page === 'playground'" class="p-8 fade-up max-w-4xl mx-auto">
+      <div class="mb-7">
+        <h1 class="text-2xl font-bold text-white">Inference Playground</h1>
+        <p class="text-sm mt-1" style="color:#475569;">Test your fine-tuned model with custom prompts</p>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 flex flex-col gap-4">
+          <div class="card p-6">
+            <label class="lbl">Prompt</label>
+            <textarea class="inp" x-model="genForm.prompt" placeholder="Enter your prompt here…"></textarea>
+
+            <div class="flex flex-wrap gap-2 mt-3">
+              <span class="text-xs" style="color:#475569;">Try:</span>
+              <template x-for="s in samplePrompts" :key="s">
+                <button class="text-xs px-2.5 py-1 rounded-full" style="background:rgba(99,102,241,.1);color:#818cf8;border:1px solid rgba(99,102,241,.2);" @click="genForm.prompt = s" x-text="s.slice(0,40) + '…'"></button>
+              </template>
+            </div>
+
+            <button class="btn btn-primary mt-4" @click="generate()" :disabled="isGenerating || !genForm.prompt.trim()">
+              <span x-show="!isGenerating">
+                <svg class="inline mr-1.5" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+                Generate
+              </span>
+              <span x-show="isGenerating" class="pulse">Generating…</span>
+            </button>
+          </div>
+
+          <template x-if="genResult">
+            <div class="card p-6 fade-up">
+              <div class="flex items-center justify-between mb-3">
+                <div class="text-xs font-semibold uppercase tracking-wider" style="color:#475569;">Response</div>
+                <div class="flex gap-3 text-xs" style="color:#475569;">
+                  <span>Prompt: <span class="text-white" x-text="genResult.prompt_tokens"></span> tok</span>
+                  <span>Output: <span class="text-white" x-text="genResult.completion_tokens"></span> tok</span>
+                  <span class="badge badge-indigo" x-text="genResult.finish_reason"></span>
+                </div>
+              </div>
+              <div class="code-block" style="color:#e2e8f0;min-height:80px;" x-text="genResult.text"></div>
+            </div>
+          </template>
+        </div>
+
+        <div class="card p-5 self-start">
+          <div class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:#475569;">Parameters</div>
+          <div class="space-y-5">
+            <div>
+              <div class="flex justify-between mb-1.5">
+                <label class="lbl" style="margin:0;">Temperature</label>
+                <span class="mono text-xs text-white" x-text="genForm.temperature"></span>
+              </div>
+              <input type="range" class="inp" min="0.01" max="2" step="0.01" x-model.number="genForm.temperature" />
+              <div class="flex justify-between text-xs mt-1" style="color:#2d4060;"><span>Deterministic</span><span>Creative</span></div>
+            </div>
+            <div>
+              <div class="flex justify-between mb-1.5">
+                <label class="lbl" style="margin:0;">Top-p</label>
+                <span class="mono text-xs text-white" x-text="genForm.top_p"></span>
+              </div>
+              <input type="range" class="inp" min="0.01" max="1" step="0.01" x-model.number="genForm.top_p" />
+            </div>
+            <div>
+              <label class="lbl">Max tokens</label>
+              <input type="number" class="inp" min="1" max="2048" x-model.number="genForm.max_new_tokens" />
+            </div>
+          </div>
+
+          <div class="mt-5 pt-4 border-t text-xs" style="border-color:#1e3050;color:#334155;">
+            <div class="font-semibold mb-1.5" style="color:#475569;">Note</div>
+            Running in demo mode. Connect a vLLM adapter for real inference.
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function app() {
+      return {
+        page: 'dashboard',
+        runs: [],
+        stats: { total_runs: 0, best_loss: null, total_hours: 0, training_active: false },
+        isTraining: false,
+        trainForm: {
+          base_model: 'meta-llama/Llama-2-7b-hf',
+          dataset: 'tatsu-lab/alpaca',
+          num_epochs: 3,
+          max_samples: 200,
+          learning_rate: 0.0002,
+          per_device_train_batch_size: 4,
+          lora_r: 16,
+          lora_alpha: 32,
+          experiment_name: 'modelforge-run',
+        },
+        trainProgress: { step: 0, total: 0, loss: 0, lr: 0, epoch: 1, tokens_per_sec: 0 },
+        trainMetrics: [],
+        trainResult: null,
+        trainError: null,
+        liveChart: null,
+        expandedRun: null,
+        runCharts: {},
+        genForm: { prompt: 'Explain what a transformer model is.', max_new_tokens: 256, temperature: 0.7, top_p: 0.9 },
+        genResult: null,
+        isGenerating: false,
+        samplePrompts: [
+          'Explain what a transformer model is.',
+          'Write a Python function to reverse a string.',
+          'What is the difference between precision and recall?',
+          'How does backpropagation work?',
+        ],
+
+        async init() {
+          await Promise.all([this.loadStats(), this.loadRuns()]);
+          this.$nextTick(() => this.initLiveChart());
+        },
+        async loadStats() {
+          try { this.stats = await (await fetch('/api/stats')).json(); } catch {}
+        },
+        async loadRuns() {
+          try { this.runs = await (await fetch('/api/runs')).json(); } catch {}
+        },
+        async refresh() {
+          await Promise.all([this.loadStats(), this.loadRuns()]);
+        },
+        navigate(p) {
+          this.page = p;
+          if (p === 'train') this.$nextTick(() => this.initLiveChart());
+        },
+        async startTraining() {
+          if (this.isTraining) return;
+          this.isTraining = true;
+          this.trainMetrics = [];
+          this.trainResult = null;
+          this.trainError = null;
+          this.trainProgress = { step: 0, total: 0, loss: 0, lr: 0, epoch: 1, tokens_per_sec: 0 };
+          this.resetLiveChart();
+          const res = await fetch('/api/train', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.trainForm),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            this.trainError = err.detail ?? 'Unknown error';
+            this.isTraining = false;
+            return;
+          }
+          const es = new EventSource('/api/train/stream');
+          es.onmessage = (e) => {
+            const evt = JSON.parse(e.data);
+            if (evt.type === 'progress') {
+              const d = evt.data;
+              this.trainProgress = d;
+              this.trainMetrics.push({ step: d.step, loss: d.loss });
+              this.pushLiveChart(d.step, d.loss);
+            } else if (evt.type === 'complete') {
+              this.trainResult = evt.data;
+              this.isTraining = false;
+              es.close();
+              this.loadStats();
+              this.loadRuns();
+            } else if (evt.type === 'error') {
+              this.trainError = evt.data.message;
+              this.isTraining = false;
+              es.close();
+            }
+          };
+          es.onerror = () => { this.isTraining = false; es.close(); };
+        },
+        initLiveChart() {
+          const canvas = document.getElementById('liveChart');
+          if (!canvas) return;
+          if (this.liveChart) { this.liveChart.destroy(); this.liveChart = null; }
+          this.liveChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+              labels: [],
+              datasets: [{
+                label: 'Loss',
+                data: [],
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99,102,241,.15)',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.35,
+                fill: true,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+              scales: {
+                x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#334155', maxTicksLimit: 6 } },
+                y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#334155' } },
+              },
+            },
+          });
+        },
+        resetLiveChart() {
+          if (!this.liveChart) return;
+          this.liveChart.data.labels = [];
+          this.liveChart.data.datasets[0].data = [];
+          this.liveChart.update('none');
+        },
+        pushLiveChart(step, loss) {
+          if (!this.liveChart) return;
+          if (this.liveChart.data.labels.length > 300) {
+            this.liveChart.data.labels.shift();
+            this.liveChart.data.datasets[0].data.shift();
+          }
+          this.liveChart.data.labels.push(step);
+          this.liveChart.data.datasets[0].data.push(loss);
+          this.liveChart.update('none');
+        },
+        toggleRun(run) {
+          if (this.expandedRun?.run_id === run.run_id) {
+            this.expandedRun = null;
+            if (this.runCharts[run.run_id]) {
+              this.runCharts[run.run_id].destroy();
+              delete this.runCharts[run.run_id];
+            }
+          } else {
+            this.expandedRun = run;
+            this.$nextTick(() => this.initRunChart(run));
+          }
+        },
+        initRunChart(run) {
+          const canvas = document.getElementById(`runChart-${run.run_id}`);
+          if (!canvas) return;
+          if (this.runCharts[run.run_id]) {
+            this.runCharts[run.run_id].destroy();
+          }
+          const metrics = run.metrics ?? [];
+          this.runCharts[run.run_id] = new Chart(canvas, {
+            type: 'line',
+            data: {
+              labels: metrics.map(m => m.step),
+              datasets: [{
+                data: metrics.map(m => m.loss),
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139,92,246,.12)',
+                borderWidth: 1.5,
+                pointRadius: 0,
+                tension: 0.35,
+                fill: true,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { display: false },
+                y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#334155', font: { size: 10 } } },
+              },
+            },
+          });
+        },
+        async deleteRun(runId) {
+          if (!confirm('Delete this run? This cannot be undone.')) return;
+          await fetch(`/api/runs/${runId}`, { method: 'DELETE' });
+          if (this.expandedRun?.run_id === runId) this.expandedRun = null;
+          if (this.runCharts[runId]) { this.runCharts[runId].destroy(); delete this.runCharts[runId]; }
+          await this.loadRuns();
+          await this.loadStats();
+        },
+        async generate() {
+          if (this.isGenerating || !this.genForm.prompt.trim()) return;
+          this.isGenerating = true;
+          this.genResult = null;
+          try {
+            const r = await fetch('/api/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.genForm),
+            });
+            this.genResult = await r.json();
+          } catch (e) { this.genResult = { text: 'Error: ' + e.message, prompt_tokens: 0, completion_tokens: 0, finish_reason: 'error' }; }
+          this.isGenerating = false;
+        },
+        get progressPct() {
+          if (!this.trainProgress.total) return 0;
+          return Math.round((this.trainProgress.step / this.trainProgress.total) * 100);
+        },
+        fmtDur(secs) {
+          if (!secs) return '—';
+          if (secs < 60) return `${Math.round(secs)}s`;
+          const m = Math.floor(secs / 60), s = Math.round(secs % 60);
+          return s > 0 ? `${m}m ${s}s` : `${m}m`;
+        },
+      };
+    }
+  </script>
+</body>
+</html>
