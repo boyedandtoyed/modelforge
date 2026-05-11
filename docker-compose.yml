@@ -4,7 +4,7 @@ services:
   modelforge:
     build: .
     ports:
-      - "${PORT:-8080}:8080"
+      - "127.0.0.1:3008:8080"
     volumes:
       - ./logs:/app/logs
       - ./outputs:/app/outputs
