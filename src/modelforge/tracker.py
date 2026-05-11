@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import time
+import uuid
 from pathlib import Path
 from .trainer import TrainingRun
 
@@ -11,7 +12,9 @@ class ExperimentTracker:
         self.experiment_name = experiment_name
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        self._run_id = f"{experiment_name}-{int(time.time())}"
+        # Millisecond timestamp + 6-char UUID suffix guarantees uniqueness even
+        # when multiple trackers are created within the same second.
+        self._run_id = f"{experiment_name}-{int(time.time() * 1000)}-{uuid.uuid4().hex[:6]}"
 
     def log_run(self, run: TrainingRun) -> str:
         data = {
