@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# ModelForge runtime output
+logs/
+outputs/
+*.json
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# HuggingFace cache
+.cache/
+huggingface/
+
+# Weights & Biases
+wandb/
+
+# Docker
+.dockerignore
+
+# Misc
+*.log
+*.tmp
